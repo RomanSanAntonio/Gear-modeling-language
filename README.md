@@ -110,3 +110,7 @@ _s_s1_c_s2_i_cs_i_o_p
 
 This is a small 1 piston engine. If you press the up arrow key will start and rev forever. Not too interesting, but you get the idea.
 These code blocks can let you add anything to GML, even extend it within itself, but I will leave that up for you to do.
+
+
+
+A GML compiler is on the way!!!
