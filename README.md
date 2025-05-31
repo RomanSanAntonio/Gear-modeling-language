@@ -90,20 +90,20 @@ Example:
 
 ``` GML
 {
-  void Fire(element item): {
+  void Fire(str item): {
     if tick % 4 == 0: {
       item.RPM += 20;
     }
   }
-  void start(element item): {
+  void start(str item): {
     if key_press.up:{
       item.RPM += 10;
     }
   }
 }
-s1 = 8[h = 10]
+s1 = 8[h = 10 id = "starter" spcl = {start("starter")}]
 s2 = 128[h = 10]
-p = 1[h = 10, id = "piston", spcl = {Fire(crankshaft);}]
+p = 1[h = 10, id = "piston", spcl = {Fire("crankshaft");}]
 cs = 0[h = 10, id = "crankshaft"]
 _s_s1_c_s2_i_cs_i_o_p
 ```
