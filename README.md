@@ -90,12 +90,12 @@ Example:
 
 ``` GML
 {
-  void Fire(str item): {
+  void Fire(str item) {
     if tick % 4 == 0: {
       item.RPM += 20;
     }
   }
-  void start(str item): {
+  void start(str item) {
     if key_press.up:{
       item.RPM += 10;
     }
