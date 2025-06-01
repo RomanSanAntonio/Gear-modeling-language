@@ -113,4 +113,4 @@ These code blocks can let you add anything to GML, even extend it within itself,
 
 
 
-A GML compiler is on the way!!!
+A GML interpreter is on the way!!!
