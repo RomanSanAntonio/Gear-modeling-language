@@ -10,11 +10,12 @@ using namespace std;
 
 struct Gear {
   string name;
-  int teeth;
-  double heat;
-  string fricfunc = "";
+  int teeth = 1;
+  double heat = 20;
+  string fricfunc = "x^2";
   string id = "";
-  double rpm;
-  double nm;
-  double resistance;
+  double rpm = 0;
+  double nm = 0;
+  bool isoutput = false;
+  double resistance = 0;
 };
