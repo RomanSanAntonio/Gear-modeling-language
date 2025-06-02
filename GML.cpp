@@ -1,83 +1,104 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <unordered_map>
+#include <map>
 #include <vector>
-#include <regex>
 #include <cmath>
+#include <functional>
 
 using namespace std;
 
 struct Gear {
-  string name;
-  int teeth = 1;
-  double heat = 20;
-  string fricfunc = "x^2";
-  string id = "";
-  double rpm = 0;
-  double nm = 0;
-  bool isoutput = false;
-  double resistance = 0;
+    string name;
+    int teeth = 0;
+    double RPM = 0.0;
+    double NM = 0.0;
+    double heat = 20.0;
+    function<double(double)> friction = nullptr;
+    double resistance = 0.0;
+    string id = "";
+    string spcl = "";
+
+    vector<string> connected;
+    bool isOutput = false;
+    bool visited = false;
 };
 
 map<string, Gear> gears;
-vector<string> connectionOrder;
-double inputRPM = 0;
-double inputNM = 0;
+double inputRPM = 0.0;
+double inputNM = 0.0;
 
-double calcFrictionFunc(const string& func, double x) {
-    if (func == "x") return x;
-    if (func == "x^2") return x * x;
-    if (func == "x^3") return x * x * x;
-    if (func == "sqrt(x)") return sqrt(x);
-    if (func == "log(x)") return log(x);
-    if (func == "x/2") return x / 2;
-    if (func == "x/3") return x / 3;
-    return x;
-}
-
-
-void parseGear(string line) {
-    regex rgx(R"((\w+)\s*=\s*(\d+)(?:\[(.*?)\])?)");
-    smatch match;
-    if (regex_match(line, match, rgx)) {
-        Gear g;
-        g.name = match[1];
-        g.teeth = stod(match[2]);
-        if (match[3].matched) {
-            string attr = match[3];
-            regex propRgx(R"((\w+)\s*=\s*([^,\]]+))");
-            auto begin = sregex_iterator(attr.begin(), attr.end(), propRgx);
-            auto end = sregex_iterator();
-            for (auto i = begin; i != end; ++i) {
-                string key = (*i)[1];
-                string val = (*i)[2];
-                if (key == "f") g.frictionFunc = val;
-                else if (key == "h") g.heat = stod(val);
-                else if (key == "r") g.resistance = stod(val);
-            }
-        }
-        gears[g.name] = g;
+// === Friction function parser ===
+function<double(double)> getFrictionFunc(string expr) {
+    if (expr == "x^2") {
+        return [](double x) { return x * x; };
+    } else if (expr == "x") {
+        return [](double x) { return x; };
+    } else if (expr == "sqrt(x)") {
+        return [](double x) { return sqrt(x); };
+    } else {
+        return nullptr;
     }
 }
 
+// === Parse a line like: g1 = 8[h=20, f=x^2, r=5, id="main", spcl={...}] ===
+void parseGear(string line) {
+    stringstream ss(line);
+    string name, equals, rest;
+    ss >> name >> equals;
+    getline(ss, rest);
+
+    Gear g;
+    g.name = name;
+
+    size_t bracketPos = rest.find("[");
+    if (bracketPos != string::npos) {
+        g.teeth = stoi(rest.substr(0, bracketPos));
+        string attributes = rest.substr(bracketPos + 1, rest.find("]") - bracketPos - 1);
+        stringstream attrss(attributes);
+        string token;
+        while (getline(attrss, token, ',')) {
+            size_t eq = token.find('=');
+            if (eq == string::npos) continue;
+            string key = token.substr(0, eq);
+            string val = token.substr(eq + 1);
+            key.erase(remove_if(key.begin(), key.end(), ::isspace), key.end());
+            val.erase(remove_if(val.begin(), val.end(), ::isspace), val.end());
+
+            if (key == "h") g.heat = stod(val);
+            else if (key == "f") g.friction = getFrictionFunc(val);
+            else if (key == "r") g.resistance = stod(val);
+            else if (key == "id") g.id = val;
+            else if (key == "spcl") g.spcl = val;
+        }
+    } else {
+        g.teeth = stoi(rest);
+    }
+
+    gears[name] = g;
+}
+
+// === Parse underscore connection format ===
 void parseConnection(string line) {
     stringstream ss(line);
     string token;
+    vector<string> tokens;
     while (getline(ss, token, '_')) {
-        if (!token.empty()) connectionOrder.push_back(token);
+        if (!token.empty()) tokens.push_back(token);
     }
-}
 
-void applyInput(double rpm, double nm) {
-    inputRPM = rpm;
-    inputNM = nm;
-    for (size_t i = 0; i < connectionOrder.size(); ++i) {
-        string current = connectionOrder[i];
-        if (current == "s") {
-            string nextGear = connectionOrder[i + 1];
-            gears[nextGear].rpm = rpm;
-            gears[nextGear].nm = nm;
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        string tok = tokens[i];
+        if (tok == "s") continue;
+        else if (tok == "o") {
+            if (i + 1 < tokens.size()) gears[tokens[i + 1]].isOutput = true;
+        }
+        else if (tok == "c" || tok == "i") {
+            if (i > 0 && i + 1 < tokens.size()) {
+                string a = tokens[i - 1], b = tokens[i + 1];
+                gears[a].connected.push_back(b);
+                gears[b].connected.push_back(a);
+            }
         }
     }
 }
