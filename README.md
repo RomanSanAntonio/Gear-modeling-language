@@ -3,7 +3,7 @@ This is a simple easy to read gear system modeling language with features includ
 - simple gear ratio sim with NM and RPM
 - easy to learn and to understand syntax
 - friction and heat through customizable friction functions
-- C transpiler to create custom features unique to your needs
+- C++ transpiler to create custom features unique to your needs
 
 ## Syntax
 To create a gear, just initialize it with ```name = amount-of-teeth```. 
@@ -60,7 +60,7 @@ These atributes are added to the end of an initialiser in square brakets ```[]``
 
 **ORDER MATTERS!** Anything that is out of order will be trated as a syntax error.
 
-The atributes go in this order, ```[h = degreeC, f = frictionfunc, r = resistance, id = "text", spcl={C code}]```
+The atributes go in this order, ```[h = degreeC, f = frictionfunc, r = resistance, id = "text", spcl={C++ code}]```
 
 *note that you don't have to list all of the keywords*
 
@@ -81,8 +81,8 @@ If a peice is on the edge it will have only 2 elements to average toether.
 
 ## Code Blocks
 
-**DISCLAIMER!** These code blocks are written in C. If you do not know C, I highly suggest learning that before learning the rest of GML. 
-You are still enabled to use GML without C, but to get the full functionallity of GML, please learn C.
+**DISCLAIMER!** These code blocks are written in C++. If you do not know C++, I highly suggest learning that before learning the rest of GML. 
+You are still enabled to use GML without C++, but to get the full functionallity of GML, please learn C++.
 
 These code blocks can be placed anywhere inside of curly braces `{}`
 
