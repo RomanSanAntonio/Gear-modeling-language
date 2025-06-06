@@ -102,3 +102,86 @@ void parseConnection(string line) {
         }
     }
 }
+
+// === Recursive RPM/NM distribution ===
+void distribute(string name, double rpm, double nm) {
+    Gear& g = gears[name];
+    if (g.visited) return;
+    g.visited = true;
+    g.RPM = rpm;
+    g.NM = nm;
+
+    double loss = 0;
+    if (g.friction) {
+        double fval = g.friction(rpm);
+        if (fval >= nm) {
+            g.RPM = 0;
+            loss = nm;
+        } else {
+            g.NM = nm - fval;
+            loss = fval;
+        }
+    }
+    g.heat += (rpm / 2.0) + (loss / 10.0);
+
+    for (string& conn : g.connected) {
+        Gear& next = gears[conn];
+        if (!next.visited) {
+            double ratio = (double)g.teeth / (double)next.teeth;
+            double nextRPM = rpm / ratio;
+            double nextNM = g.NM * ratio;
+            distribute(conn, nextRPM, nextNM);
+        }
+    }
+}
+
+void applyInput(double rpm, double nm) {
+    for (auto& [name, g] : gears) {
+        if (!g.visited) {
+            distribute(name, rpm, nm);
+            break;
+        }
+    }
+}
+
+void printOutputs() {
+    for (auto& [name, g] : gears) {
+        if (g.isOutput) {
+            cout << name << ":\n";
+            cout << "  RPM: " << g.RPM << "\n";
+            cout << "  NM: " << g.NM << "\n";
+            cout << "  Heat: " << g.heat << "\n";
+        }
+    }
+}
+
+// === MAIN ENTRY ===
+int main() {
+    cout << "Paste your GML code below. Press Ctrl+D (or Ctrl+Z then Enter on Windows) to run:\n";
+
+    stringstream inputBuffer;
+    string line;
+    while (getline(cin, line)) {
+        inputBuffer << line << "\n";
+    }
+
+    string inputText = inputBuffer.str();
+    stringstream ss(inputText);
+
+    while (getline(ss, line)) {
+        if (line.find('=') != string::npos && line.find("_") == string::npos) {
+            parseGear(line);
+        } else if (line.find("RPM:") != string::npos) {
+            inputRPM = stod(line.substr(line.find(":") + 1));
+        } else if (line.find("NM:") != string::npos) {
+            inputNM = stod(line.substr(line.find(":") + 1));
+        } else if (line.find("_") != string::npos) {
+            parseConnection(line);
+        }
+    }
+
+    applyInput(inputRPM, inputNM);
+    printOutputs();
+
+    return 0;
+}
