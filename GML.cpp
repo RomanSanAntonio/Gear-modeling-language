@@ -1,188 +1,128 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <vector>
-#include <cmath>
-#include <functional>
+#include <regex>
 
 using namespace std;
 
 struct Gear {
     string name;
-    int teeth = 0;
+    double teeth;
     double RPM = 0.0;
     double NM = 0.0;
-    double heat = 20.0;
-    function<double(double)> friction = nullptr;
-    double resistance = 0.0;
-    string id = "";
-    string spcl = "";
-
     vector<string> connected;
-    bool isOutput = false;
-    bool visited = false;
 };
 
-map<string, Gear> gears;
-double inputRPM = 0.0;
-double inputNM = 0.0;
+unordered_map<string, Gear> gears;
+unordered_map<string, double> rpmInputs;
+unordered_map<string, double> nmInputs;
 
-// === Friction function parser ===
-function<double(double)> getFrictionFunc(string expr) {
-    if (expr == "x^2") {
-        return [](double x) { return x * x; };
-    } else if (expr == "x") {
-        return [](double x) { return x; };
-    } else if (expr == "sqrt(x)") {
-        return [](double x) { return sqrt(x); };
-    } else {
-        return nullptr;
+// Trim spaces
+string trim(const string& s) {
+    size_t start = s.find_first_not_of(" \t\r\n");
+    size_t end = s.find_last_not_of(" \t\r\n");
+    return (start == string::npos) ? "" : s.substr(start, end - start + 1);
+}
+
+// Parse gear assignments like "g1 = 8"
+void parseGear(const string& line) {
+    regex r(R"((\w+)\s*=\s*([0-9.]+))");
+    smatch m;
+    if (regex_match(line, m, r)) {
+        Gear g;
+        g.name = m[1];
+        g.teeth = stod(m[2]);
+        gears[g.name] = g;
     }
 }
 
-// === Parse a line like: g1 = 8[h=20, f=x^2, r=5, id="main", spcl={...}] ===
-void parseGear(string line) {
-    stringstream ss(line);
-    string name, equals, rest;
-    ss >> name >> equals;
-    getline(ss, rest);
-
-    Gear g;
-    g.name = name;
-
-    size_t bracketPos = rest.find("[");
-    if (bracketPos != string::npos) {
-        g.teeth = stoi(rest.substr(0, bracketPos));
-        string attributes = rest.substr(bracketPos + 1, rest.find("]") - bracketPos - 1);
-        stringstream attrss(attributes);
-        string token;
-        while (getline(attrss, token, ',')) {
-            size_t eq = token.find('=');
-            if (eq == string::npos) continue;
-            string key = token.substr(0, eq);
-            string val = token.substr(eq + 1);
-            key.erase(remove_if(key.begin(), key.end(), ::isspace), key.end());
-            val.erase(remove_if(val.begin(), val.end(), ::isspace), val.end());
-
-            if (key == "h") g.heat = stod(val);
-            else if (key == "f") g.friction = getFrictionFunc(val);
-            else if (key == "r") g.resistance = stod(val);
-            else if (key == "id") g.id = val;
-            else if (key == "spcl") g.spcl = val;
-        }
-    } else {
-        g.teeth = stoi(rest);
-    }
-
-    gears[name] = g;
-}
-
-// === Parse underscore connection format ===
-void parseConnection(string line) {
-    stringstream ss(line);
-    string token;
+// Parse connections like g1_c_g2_i_g3
+void parseConnection(const string& line) {
     vector<string> tokens;
-    while (getline(ss, token, '_')) {
-        if (!token.empty()) tokens.push_back(token);
-    }
-
-    for (size_t i = 0; i < tokens.size(); ++i) {
-        string tok = tokens[i];
-        if (tok == "s") continue;
-        else if (tok == "o") {
-            if (i + 1 < tokens.size()) gears[tokens[i + 1]].isOutput = true;
-        }
-        else if (tok == "c" || tok == "i") {
-            if (i > 0 && i + 1 < tokens.size()) {
-                string a = tokens[i - 1], b = tokens[i + 1];
-                gears[a].connected.push_back(b);
-                gears[b].connected.push_back(a);
+    string temp;
+    for (char c : line) {
+        if (c == '_') {
+            if (!temp.empty()) {
+                tokens.push_back(temp);
+                temp.clear();
             }
-        }
-    }
-}
-
-// === Recursive RPM/NM distribution ===
-void distribute(string name, double rpm, double nm) {
-    Gear& g = gears[name];
-    if (g.visited) return;
-    g.visited = true;
-    g.RPM = rpm;
-    g.NM = nm;
-
-    double loss = 0;
-    if (g.friction) {
-        double fval = g.friction(rpm);
-        if (fval >= nm) {
-            g.RPM = 0;
-            loss = nm;
         } else {
-            g.NM = nm - fval;
-            loss = fval;
+            temp += c;
         }
     }
-    g.heat += (rpm / 2.0) + (loss / 10.0);
+    if (!temp.empty()) tokens.push_back(temp);
 
-    for (string& conn : g.connected) {
-        Gear& next = gears[conn];
-        if (!next.visited) {
-            double ratio = (double)g.teeth / (double)next.teeth;
-            double nextRPM = rpm / ratio;
-            double nextNM = g.NM * ratio;
-            distribute(conn, nextRPM, nextNM);
+    for (size_t i = 0; i < tokens.size() - 1; i++) {
+        string g1 = tokens[i];
+        string g2 = tokens[i + 1];
+
+        // If it's an operation like "c", skip
+        if (g1 == "c" || g1 == "i" || g1 == "o" || g1 == "s") continue;
+        if (g2 == "c" || g2 == "i" || g2 == "o" || g2 == "s") continue;
+
+        gears[g1].connected.push_back(g2);
+    }
+}
+
+// Parse input lines like RPM:g1=40,g3=10
+void parseInputLine(const string& line, bool isRPM) {
+    string data = line.substr(line.find(":") + 1);
+    stringstream ss(data);
+    string item;
+    while (getline(ss, item, ',')) {
+        size_t eq = item.find('=');
+        if (eq != string::npos) {
+            string name = trim(item.substr(0, eq));
+            double val = stod(trim(item.substr(eq + 1)));
+            if (isRPM) rpmInputs[name] = val;
+            else nmInputs[name] = val;
         }
     }
 }
 
-void applyInput(double rpm, double nm) {
-    for (auto& [name, g] : gears) {
-        if (!g.visited) {
-            distribute(name, rpm, nm);
-            break;
-        }
+void applyInputs() {
+    for (const auto& [name, rpm] : rpmInputs) {
+        if (gears.count(name)) gears[name].RPM = rpm;
+    }
+    for (const auto& [name, nm] : nmInputs) {
+        if (gears.count(name)) gears[name].NM = nm;
     }
 }
 
-void printOutputs() {
-    for (auto& [name, g] : gears) {
-        if (g.isOutput) {
+void simulate() {
+    applyInputs();
+
+    cout << "\n--- Output ---" << endl;
+    for (auto& [name, gear] : gears) {
+        if (gear.RPM != 0 || gear.NM != 0) {
             cout << name << ":\n";
-            cout << "  RPM: " << g.RPM << "\n";
-            cout << "  NM: " << g.NM << "\n";
-            cout << "  Heat: " << g.heat << "\n";
+            cout << "  RPM: " << gear.RPM << "\n";
+            cout << "  NM : " << gear.NM << "\n";
         }
     }
 }
 
-// === MAIN ENTRY ===
 int main() {
-    cout << "Paste your GML code below. Press Ctrl+D (or Ctrl+Z then Enter on Windows) to run:\n";
+    cout << "Enter your GML code below (type END to finish):\n";
 
-    stringstream inputBuffer;
     string line;
     while (getline(cin, line)) {
-        inputBuffer << line << "\n";
-    }
+        line = trim(line);
+        if (line == "END") break;
 
-    string inputText = inputBuffer.str();
-    stringstream ss(inputText);
-
-    while (getline(ss, line)) {
-        if (line.find('=') != string::npos && line.find("_") == string::npos) {
+        if (line.find('=') != string::npos && line.find("_") == string::npos && line.find(':') == string::npos) {
             parseGear(line);
-        } else if (line.find("RPM:") != string::npos) {
-            inputRPM = stod(line.substr(line.find(":") + 1));
-        } else if (line.find("NM:") != string::npos) {
-            inputNM = stod(line.substr(line.find(":") + 1));
-        } else if (line.find("_") != string::npos) {
+        } else if (line.find("RPM:") == 0) {
+            parseInputLine(line, true);
+        } else if (line.find("NM:") == 0) {
+            parseInputLine(line, false);
+        } else {
             parseConnection(line);
         }
     }
 
-    applyInput(inputRPM, inputNM);
-    printOutputs();
-
+    simulate();
     return 0;
 }
-// Going to add the C++ blocks later. 5 months, MAX!
