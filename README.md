@@ -39,8 +39,8 @@ g3 = 8
 g4 = 128
 g5 = 8
 _p_g1_i_g2_c_g3_i_g4_c_o_g5
-RPM:2
-NM:100
+RPM:g1=2
+NM:g1=100
 ```
 Output:
 ``` GML
